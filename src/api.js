@@ -99,25 +99,15 @@ function parseAIResponse(raw) {
   throw new Error('La IA no devolvió JSON válido. Intenta nuevamente.');
 }
 
-async function callGemini(prompt) {
-  const key = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!key) throw new Error('VITE_GEMINI_API_KEY no configurada en .env');
+async function callGASForQuestions(params) {
+  const gasUrl = import.meta.env.VITE_GAS_URL;
+  if (!gasUrl) throw new Error('VITE_GAS_URL no configurada en .env');
 
-  const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.75, maxOutputTokens: 4096 },
-      }),
-    }
-  );
-
+  const url = `${gasUrl}?action=generateQuestion&examId=${encodeURIComponent(params.examId)}&skillId=${encodeURIComponent(params.skillId || '')}&count=${encodeURIComponent(params.count || 5)}&userEmail=${encodeURIComponent(params.userEmail || '')}`;
+  const resp = await fetch(url);
   const data = await resp.json();
-  if (data.error) throw new Error('Gemini error: ' + data.error.message);
-  return data.candidates[0].content.parts[0].text;
+  if (data.error) throw new Error(data.error);
+  return data;
 }
 
 async function saveToBancoIA(questions, examId, skillId, userEmail) {
@@ -442,33 +432,8 @@ REGLAS CRÍTICAS:
     const ctx = EXAM_CONTEXT[examId];
     if (!ctx) throw new Error('examId no reconocido: ' + examId);
 
-    const n      = Math.min(Number(count) || 5, 10);
-    const prompt = buildPrompt(examId, skillId, n);
-    const raw    = await callGemini(prompt);
-
-    let parsed = parseAIResponse(raw);
-    if (!Array.isArray(parsed)) parsed = [parsed];
-
-    const ts = String(Date.now());
-    const questions = parsed
-      .map((q, i) => ({
-        id:          `ai_${examId}_${skillId || 'mix'}_${ts}_${i}`,
-        skill:       q.skill || skillId || 'mixed',
-        text:        String(q.text || '').trim(),
-        options:     Array.isArray(q.options) ? q.options.map(String) : [],
-        correct:     typeof q.correct === 'number' ? q.correct : 0,
-        explanation: String(q.explanation || '').trim(),
-        aiGenerated: true,
-        provider:    'gemini',
-      }))
-      .filter(q => q.text.length > 0 && q.options.length >= 4);
-
-    if (questions.length === 0) {
-      throw new Error('La IA generó preguntas con formato inválido. Intenta nuevamente.');
-    }
-
-    saveToBancoIA(questions, examId, skillId, userEmail);
-
-    return { ok: true, questions, provider: 'gemini', count: questions.length };
+    const n = Math.min(Number(count) || 5, 10);
+    const result = await callGASForQuestions({ examId, skillId, count: n, userEmail });
+    return result;
   },
 };

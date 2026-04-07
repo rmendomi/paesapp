@@ -11,6 +11,7 @@ import {
 
 const AuthContext = createContext(null);
 
+
 const EXAM_IDS = ['lectora', 'm1', 'm2', 'historia', 'ciencias'];
 
 function todayStr()     { return new Date().toISOString().split('T')[0]; }
@@ -79,36 +80,23 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (IS_DEMO_BACKEND) { setAuthLoading(false); return; }
 
-    let resolved = false;
-    const resolve = () => { if (!resolved) { resolved = true; setAuthLoading(false); } };
+    let active = true;
 
-    // Timeout de seguridad: si getSession tarda más de 5s, liberar el loading
-    const timeout = setTimeout(() => {
-      console.warn('[AuthContext] getSession timeout — liberando loading');
-      resolve();
-    }, 5000);
-
-    // Verificar si hay sesión activa al montar
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        clearTimeout(timeout);
-        resolve();
-        if (session?.user?.email) {
-          loadUserData(session.user.email); // sin await — no bloquea
-        }
-      })
-      .catch((err) => {
-        clearTimeout(timeout);
-        console.error('[AuthContext] getSession error:', err);
-        resolve();
-      });
-
-    // Suscribirse a cambios de auth (login / logout / verificación email)
+    // onAuthStateChange dispara INITIAL_SESSION con la sesión actual (supabase-js v2).
+    // El flag `active` evita actualizaciones de estado en el cleanup de StrictMode.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user?.email) {
+      if (!active) return;
+      if (event === 'INITIAL_SESSION') {
+        try {
+          if (session?.user?.email) {
+            await loadUserData(session.user.email);
+          }
+        } finally {
+          if (active) setAuthLoading(false);
+        }
+      } else if (event === 'SIGNED_IN' && session?.user?.email) {
         await loadUserData(session.user.email);
-      }
-      if (event === 'SIGNED_OUT') {
+      } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setSessions([]);
         setStreak({ current: 0, best: 0, totalDays: 0, lastActivity: '', history: {} });
@@ -118,7 +106,7 @@ export function AuthProvider({ children }) {
       }
     });
 
-    return () => { clearTimeout(timeout); subscription.unsubscribe(); };
+    return () => { active = false; subscription.unsubscribe(); };
   }, [loadUserData]);
 
   // ── Registro con email + contraseña ─────────────────────────────
