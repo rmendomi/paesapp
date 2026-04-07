@@ -361,19 +361,22 @@ export const api = {
     const uInfo = Object.fromEntries((usrRes.data || []).map(u => [u.email, u]));
     const sInfo = Object.fromEntries((strRes.data || []).map(s => [s.user_email, s.current || 0]));
 
-    const entries = Object.entries(byUser)
-      .filter(([, u]) => u.count > 0)
-      .map(([email, u]) => {
-        const avg  = Math.round(u.total / u.count);
-        const info = uInfo[email] || {};
+    // Incluir TODOS los usuarios, no solo los que tienen sesiones
+    const entries = Object.values(uInfo)
+      .map(info => {
+        const u   = byUser[info.email] || { total: 0, count: 0 };
+        const avg = u.count > 0 ? Math.round(u.total / u.count) : 0;
         return {
-          email, name:  info.name  || email.split('@')[0],
-          school: info.school || '', avgScore: avg,
-          streak: sInfo[email] || 0, sessions: u.count,
-          xp: u.count * 100 + avg,
+          email:    info.email,
+          name:     info.name   || info.email.split('@')[0],
+          school:   info.school || '',
+          avgScore: avg,
+          streak:   sInfo[info.email] || 0,
+          sessions: u.count,
+          xp:       u.count * 100 + avg + (sInfo[info.email] || 0) * 10,
         };
       })
-      .sort((a, b) => b.avgScore - a.avgScore)
+      .sort((a, b) => b.xp - a.xp || b.avgScore - a.avgScore)
       .slice(0, 20)
       .map((e, i) => ({ ...e, rank: i + 1 }));
 

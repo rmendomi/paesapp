@@ -33,14 +33,27 @@ export default function Universities() {
   const [search,   setSearch]   = useState('');
   const [expanded, setExpanded] = useState({});
 
+  // Permite tipear libremente; el clampeo se aplica solo al salir del campo
   const setScore = (id, val) => {
-    const n = val === '' ? '' : Math.min(1000, Math.max(100, parseInt(val) || 100));
-    setScores(prev => ({ ...prev, [id]: n === '' ? '' : n }));
+    const digits = val.replace(/\D/g, '').slice(0, 4);
+    setScores(prev => ({ ...prev, [id]: digits }));
   };
 
-  // Puntajes numéricos válidos
+  const blurScore = (id) => {
+    const val = scores[id];
+    if (!val || val === '') return;
+    const n = parseInt(val, 10);
+    setScores(prev => ({
+      ...prev,
+      [id]: isNaN(n) || n === 0 ? '' : String(Math.min(1000, Math.max(100, n))),
+    }));
+  };
+
+  // Solo puntajes válidos PAES (100–1000) para el cálculo
   const scoresObj = Object.fromEntries(
-    Object.entries(scores).filter(([, v]) => v !== '' && !isNaN(Number(v))).map(([k, v]) => [k, Number(v)])
+    Object.entries(scores)
+      .filter(([, v]) => v !== '' && Number(v) >= 100 && Number(v) <= 1000)
+      .map(([k, v]) => [k, Number(v)])
   );
   const hasScores = Object.keys(scoresObj).length > 0;
 
@@ -89,8 +102,11 @@ export default function Universities() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div>
               <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(12,31,61,0.5)' }}>NEM</label>
-              <input type="number" min="100" max="1000"
-                value={scores.nem} onChange={e => setScore('nem', e.target.value)}
+              <input
+                type="text" inputMode="numeric" pattern="[0-9]*"
+                value={scores.nem}
+                onChange={e => setScore('nem', e.target.value)}
+                onBlur={() => blurScore('nem')}
                 placeholder="ej. 650"
                 className="w-full px-3 py-2.5 rounded-xl text-sm font-medium outline-none"
                 style={{ background: '#f8faff', border: '1.5px solid rgba(12,31,61,0.1)', color: '#0c1f3d' }} />
@@ -100,8 +116,11 @@ export default function Universities() {
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(12,31,61,0.5)' }}>
                   {exam.icon} {exam.code}
                 </label>
-                <input type="number" min="100" max="1000"
-                  value={scores[exam.id]} onChange={e => setScore(exam.id, e.target.value)}
+                <input
+                  type="text" inputMode="numeric" pattern="[0-9]*"
+                  value={scores[exam.id]}
+                  onChange={e => setScore(exam.id, e.target.value)}
+                  onBlur={() => blurScore(exam.id)}
                   placeholder="100–1000"
                   className="w-full px-3 py-2.5 rounded-xl text-sm font-medium outline-none"
                   style={{ background: exam.bg, border: `1.5px solid ${exam.color}25`, color: '#0c1f3d' }} />
@@ -210,12 +229,25 @@ export default function Universities() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-display font-semibold" style={{ color: '#0c1f3d' }}>{uni.name}</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'rgba(12,31,61,0.45)' }}>
-                    {uni.abbr} · {uni.careers.length} carreras
+                  <p className="text-xs mt-0.5 flex flex-wrap items-center gap-x-1.5" style={{ color: 'rgba(12,31,61,0.45)' }}>
+                    <span>{uni.abbr}</span>
+                    {uni.ciudad && <><span style={{ color: 'rgba(12,31,61,0.2)' }}>·</span><span>{uni.ciudad}</span></>}
+                    {uni.tipo && (
+                      <><span style={{ color: 'rgba(12,31,61,0.2)' }}>·</span>
+                      <span className="px-1.5 py-0.5 rounded-md text-xs font-medium"
+                        style={{
+                          background: uni.tipo === 'Estatal' ? 'rgba(29,78,216,0.08)' : uni.tipo === 'Privada CRUCH' ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)',
+                          color:      uni.tipo === 'Estatal' ? '#1d4ed8'              : uni.tipo === 'Privada CRUCH' ? '#059669'              : '#b45309',
+                        }}>{uni.tipo}</span></>
+                    )}
+                    {uni.acreditacion && <><span style={{ color: 'rgba(12,31,61,0.2)' }}>·</span><span>⭐ {uni.acreditacion} años</span></>}
+                    <span style={{ color: 'rgba(12,31,61,0.2)' }}>·</span>
+                    <span>{uni.careers.length} carreras</span>
                     {qualified !== null && (
-                      <span className="ml-2 font-semibold" style={{ color: qualified > 0 ? '#10b981' : '#ef4444' }}>
-                        · {qualified} elegibles
-                      </span>
+                      <><span style={{ color: 'rgba(12,31,61,0.2)' }}>·</span>
+                      <span className="font-semibold" style={{ color: qualified > 0 ? '#10b981' : '#ef4444' }}>
+                        {qualified} elegibles
+                      </span></>
                     )}
                   </p>
                 </div>
@@ -226,6 +258,22 @@ export default function Universities() {
 
               {isExpanded && (
                 <div className="border-t" style={{ borderColor: 'rgba(12,31,61,0.06)' }}>
+                  {/* Descripción e info de la universidad */}
+                  {uni.descripcion && (
+                    <div className="px-5 py-3 flex items-start gap-3"
+                      style={{ background: `${uni.color}06`, borderBottom: '1px solid rgba(12,31,61,0.05)' }}>
+                      <div className="flex-1">
+                        <p className="text-xs leading-relaxed" style={{ color: 'rgba(12,31,61,0.6)' }}>{uni.descripcion}</p>
+                      </div>
+                      {uni.acreditacion && (
+                        <div className="flex-shrink-0 text-center px-3 py-1.5 rounded-xl"
+                          style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                          <p className="text-xs font-bold" style={{ color: '#b45309' }}>⭐ {uni.acreditacion}</p>
+                          <p className="text-xs" style={{ color: 'rgba(12,31,61,0.4)', fontSize: 10 }}>años acred.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {careerResults.map((career, i) => {
                     const { weighted, qualifies, missing } = career;
                     return (

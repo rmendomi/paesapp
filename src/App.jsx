@@ -67,7 +67,9 @@ export default function App() {
   const handleLogout = () => { logout(); setView('landing'); };
 
   // ── Pantalla de carga inicial (verificando sesión) ────────────────
-  if (authLoading) {
+  // No desmontar 'register' durante authLoading: evita que setEmailSent() quede sin efecto
+  // al ejecutarse sobre una instancia desmontada (React 18 ignora setState en unmounted).
+  if (authLoading && view !== 'register') {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#f8faff' }}>
         <div className="text-center">
