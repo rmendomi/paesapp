@@ -125,7 +125,11 @@ export function AuthProvider({ children }) {
   const register = useCallback(async ({ email, password, nombre, anioNacimiento, situacion, region, colegioId }) => {
     setAuthLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: window.location.origin },
+      });
       if (error) throw new Error(error.message);
 
       // Crear perfil en tabla usuarios
