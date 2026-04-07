@@ -1,12 +1,44 @@
 import { useState } from 'react';
-import { ArrowRight, X, BookOpen, Zap, Trophy } from 'lucide-react';
+import { ArrowRight, X, BookOpen, Zap, Trophy, Sparkles } from 'lucide-react';
 import { exams, progressStats, studentProfile, skillsConfig, getSkillQuestions, getAllQuestions, shuffle } from '../data/mockData';
+import { useAuth } from '../context/AuthContext';
+import { api, IS_DEMO_BACKEND } from '../api';
 
 export default function Exams({ onNavigate }) {
-  const [modal, setModal] = useState(null); // { examId } or null
+  const { user } = useAuth();
+  const [modal,     setModal]     = useState(null);  // { examId } | null
+  const [aiLoading, setAiLoading] = useState(false);
 
-  const openModal = (examId) => setModal({ examId });
+  const openModal  = (examId) => setModal({ examId });
   const closeModal = () => setModal(null);
+
+  const startAIPractice = async (examId, skillId = null) => {
+    if (IS_DEMO_BACKEND) {
+      alert('La generación con IA requiere el backend configurado (VITE_GAS_URL). En modo demo usa las preguntas estáticas.');
+      return;
+    }
+    closeModal();
+    setAiLoading(true);
+    try {
+      const result = await api.generateQuestions({
+        examId,
+        skillId,
+        count: 10,
+        userEmail: user?.email,
+      });
+      const exam = exams.find(e => e.id === examId);
+      let skillName = `${exam.name} ✨ IA`;
+      if (skillId) {
+        const skill = skillsConfig[examId].find(s => s.id === skillId);
+        skillName = `${exam.name} · ${skill.name} ✨ IA`;
+      }
+      onNavigate('practice', { examId, questions: result.questions, mode: 'practice', skillName });
+    } catch (err) {
+      alert('Error generando preguntas con IA: ' + err.message);
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const startPractice = (examId, mode, skillId = null) => {
     const exam = exams.find(e => e.id === examId);
@@ -32,6 +64,16 @@ export default function Exams({ onNavigate }) {
 
   return (
     <div className="px-8 py-8 space-y-8">
+
+      {/* Loading overlay — generación IA */}
+      {aiLoading && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4"
+          style={{ background: 'rgba(12,31,61,0.75)', backdropFilter: 'blur(8px)' }}>
+          <div className="w-14 h-14 rounded-full border-4 border-white/20 border-t-white animate-spin" />
+          <p className="font-semibold text-white text-lg">Generando preguntas con IA...</p>
+          <p className="text-white/50 text-sm">Gemini está creando preguntas únicas para ti</p>
+        </div>
+      )}
       <div className="fade-up delay-1">
         <h1 className="font-display text-3xl font-light" style={{ color: '#0c1f3d' }}>
           Pruebas <em>PAES disponibles</em>
@@ -185,6 +227,28 @@ export default function Exams({ onNavigate }) {
                   <ArrowRight size={14} style={{ color: 'rgba(12,31,61,0.3)', marginTop: 3, flexShrink: 0 }} />
                 </button>
 
+                {/* AI Practice */}
+                <button
+                  onClick={() => startAIPractice(modal.examId)}
+                  className="w-full flex items-start gap-4 p-4 rounded-2xl text-left transition-all hover:scale-[1.01]"
+                  style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.07), rgba(79,70,229,0.07))', border: '1.5px solid rgba(124,58,237,0.25)' }}>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: 'rgba(124,58,237,0.12)' }}>
+                    <Sparkles size={16} style={{ color: '#7c3aed' }} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="font-semibold text-sm" style={{ color: '#0c1f3d' }}>Práctica con IA</p>
+                      <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold"
+                        style={{ background: 'rgba(124,58,237,0.12)', color: '#7c3aed' }}>Nuevo</span>
+                    </div>
+                    <p className="text-xs" style={{ color: 'rgba(12,31,61,0.5)' }}>
+                      10 preguntas generadas por Gemini · Retroalimentación inmediata
+                    </p>
+                  </div>
+                  <ArrowRight size={14} style={{ color: 'rgba(124,58,237,0.4)', marginTop: 3, flexShrink: 0 }} />
+                </button>
+
                 {/* Global essay */}
                 <button
                   onClick={() => startPractice(modal.examId, 'global')}
@@ -206,21 +270,30 @@ export default function Exams({ onNavigate }) {
                 {/* Sub-essays by skill */}
                 <div>
                   <p className="text-xs font-semibold mb-2 px-1" style={{ color: 'rgba(12,31,61,0.45)' }}>
-                    Sub-ensayo por habilidad (20 preguntas · Modo examen)
+                    Sub-ensayo por habilidad
                   </p>
                   <div className="space-y-2">
                     {skills.map(skill => (
-                      <button key={skill.id}
-                        onClick={() => startPractice(modal.examId, 'skill', skill.id)}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all hover:scale-[1.01]"
-                        style={{ background: `${skill.color}08`, border: `1px solid ${skill.color}20` }}>
-                        <span className="text-base">{skill.icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate" style={{ color: '#0c1f3d' }}>{skill.name}</p>
-                          <p className="text-xs truncate" style={{ color: 'rgba(12,31,61,0.45)' }}>{skill.description}</p>
-                        </div>
-                        <ArrowRight size={13} style={{ color: `${skill.color}80`, flexShrink: 0 }} />
-                      </button>
+                      <div key={skill.id} className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => startPractice(modal.examId, 'skill', skill.id)}
+                          className="flex-1 flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all hover:scale-[1.01]"
+                          style={{ background: `${skill.color}08`, border: `1px solid ${skill.color}20` }}>
+                          <span className="text-base">{skill.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate" style={{ color: '#0c1f3d' }}>{skill.name}</p>
+                            <p className="text-xs truncate" style={{ color: 'rgba(12,31,61,0.45)' }}>20 preguntas · Modo examen</p>
+                          </div>
+                          <ArrowRight size={13} style={{ color: `${skill.color}80`, flexShrink: 0 }} />
+                        </button>
+                        <button
+                          onClick={() => startAIPractice(modal.examId, skill.id)}
+                          title="Generar con IA"
+                          className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0 transition-all hover:scale-110"
+                          style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.2)' }}>
+                          <Sparkles size={14} style={{ color: '#7c3aed' }} />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>

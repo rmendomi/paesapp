@@ -164,10 +164,10 @@ export default function Dashboard({ onNavigate }) {
       {/* Accesos rápidos */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 fade-up delay-5">
         {[
-          { label: 'Calculadora',  sub: 'Puntajes y ranking',    icon: '🧮', view: 'calculator',   color: '#1d4ed8', bg: '#eff6ff' },
-          { label: 'Universidades', sub: 'Ver carreras',          icon: '🎓', view: 'universities', color: '#7c3aed', bg: '#f5f3ff' },
-          { label: 'Planificador', sub: 'Semana de estudio',      icon: '📅', view: 'planner',      color: '#0891b2', bg: '#ecfeff' },
-          { label: 'Ranking',      sub: `Racha: ${streak.current} días 🔥`, icon: '🏆', view: 'leaderboard', color: '#f59e0b', bg: '#fffbeb' },
+          { label: 'Calculadora & Univers.', sub: 'Puntajes, percentil y carreras', icon: '🎓', view: 'universities', color: '#1d4ed8', bg: '#eff6ff' },
+          { label: 'Planificador IA',        sub: 'Plan adaptado a tus resultados', icon: '🤖', view: 'planner',      color: '#7c3aed', bg: '#f5f3ff' },
+          { label: 'Mi Progreso',            sub: 'Evolución por prueba',           icon: '📈', view: 'progress',     color: '#0891b2', bg: '#ecfeff' },
+          { label: 'Ranking',                sub: `Racha: ${streak.current} días 🔥`, icon: '🏆', view: 'leaderboard', color: '#f59e0b', bg: '#fffbeb' },
         ].map(({ label, sub, icon, view, color, bg }) => (
           <button
             key={view}

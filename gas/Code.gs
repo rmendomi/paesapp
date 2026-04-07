@@ -16,10 +16,67 @@ var SS_ID = '16toegriqoV1bde-fDQGh9RvNrs9E9ZhKhTLmEjtPjHA';
 
 // ── Inicializar hojas con headers ──────────────────────────────────
 var SHEET_HEADERS = {
-  usuarios: ['email','name','picture','school','gradeLevel','targetScore','targets','createdAt','lastLogin'],
-  sesiones: ['id','userEmail','examId','mode','correct','total','score','date'],
-  streak:   ['userEmail','current','best','totalDays','lastActivity','history'],
-  planner:  ['userEmail','weekId','planId','progress','updatedAt'],
+  usuarios:  ['email','name','picture','school','gradeLevel','targetScore','targets','createdAt','lastLogin'],
+  sesiones:  ['id','userEmail','examId','mode','correct','total','score','date'],
+  streak:    ['userEmail','current','best','totalDays','lastActivity','history'],
+  planner:   ['userEmail','weekId','planId','progress','updatedAt'],
+  banco_ia:  ['id','examId','skillId','text','options','correct','explanation','generadoPor','fecha'],
+};
+
+// ── Configuración IA ───────────────────────────────────────────────
+// Cambia esta variable para alternar proveedor: 'gemini' | 'claude'
+var AI_PROVIDER = 'claude';
+
+var EXAM_CONTEXT = {
+  lectora: {
+    name: 'Comprensión Lectora PAES',
+    instructions: 'Genera preguntas de comprensión lectora estilo PAES chilena. Incluye un texto de lectura (150-250 palabras, informativo o literario) seguido de la pregunta. El texto debe ser coherente y de nivel 4° medio.',
+    skills: {
+      localizar:   'Localizar y recuperar información explícita del texto',
+      interpretar: 'Interpretar e integrar información implícita del texto',
+      evaluar:     'Evaluar y reflexionar críticamente sobre el texto, propósito y estructura',
+    },
+  },
+  m1: {
+    name: 'Matemática M1 PAES',
+    instructions: 'Genera problemas matemáticos estilo PAES M1 (nivel 4° medio básico-medio). Temas: números, álgebra, geometría, estadística y probabilidad. Los cálculos deben ser verificados y correctos.',
+    skills: {
+      resolver:    'Resolver problemas usando procedimientos y algoritmos matemáticos',
+      modelar:     'Modelar situaciones cotidianas con expresiones o ecuaciones matemáticas',
+      representar: 'Representar información en gráficos, tablas o expresiones algebraicas',
+      argumentar:  'Argumentar y justificar propiedades o resultados matemáticos',
+    },
+  },
+  m2: {
+    name: 'Matemática M2 PAES',
+    instructions: 'Genera problemas matemáticos estilo PAES M2 (nivel avanzado). Temas: funciones, trigonometría, vectores, geometría analítica, cálculo básico. Verifica todos los cálculos.',
+    skills: {
+      resolver:    'Resolver problemas avanzados con funciones, trigonometría o cálculo',
+      modelar:     'Modelar fenómenos reales con funciones matemáticas',
+      representar: 'Representar funciones, vectores y transformaciones geométricas',
+      argumentar:  'Demostrar y argumentar propiedades matemáticas avanzadas',
+    },
+  },
+  historia: {
+    name: 'Historia y Cs. Sociales PAES',
+    instructions: 'Genera preguntas de historia y ciencias sociales estilo PAES. Temas: historia de Chile, historia universal, geografía, educación cívica y economía básica.',
+    skills: {
+      temporal: 'Pensamiento temporal: causas, consecuencias y procesos históricos en el tiempo',
+      fuentes:  'Análisis de fuentes: interpretar documentos históricos, mapas o estadísticas',
+      critico:  'Pensamiento crítico: evaluar múltiples perspectivas e interpretaciones históricas',
+    },
+  },
+  ciencias: {
+    name: 'Ciencias Naturales PAES',
+    instructions: 'Genera preguntas de ciencias naturales estilo PAES (biología, química o física). Indica el área al inicio de la pregunta. Los datos y conceptos deben ser científicamente correctos.',
+    skills: {
+      observar:   'Observar y describir fenómenos naturales con precisión científica',
+      planificar: 'Planificar y diseñar investigaciones o experimentos científicos',
+      procesar:   'Procesar e interpretar datos, gráficos o resultados de experimentos',
+      evaluar:    'Evaluar evidencias y sacar conclusiones científicas fundamentadas',
+      comunicar:  'Comunicar y explicar conceptos y conocimientos científicos',
+    },
+  },
 };
 
 function getSheet(name) {
@@ -77,6 +134,7 @@ function handleRequest(e) {
       case 'updateStreak':        result = updateStreak(params);        break;
       case 'savePlannerProgress': result = savePlannerProgress(params); break;
       case 'getLeaderboard':      result = getLeaderboard(params);      break;
+      case 'generateQuestion':    result = generateQuestion(params);    break;
       default: result = { error: 'Acción desconocida: ' + params.action };
     }
 
@@ -313,4 +371,174 @@ function getLeaderboard() {
   entries.forEach(function(e, i) { e.rank = i + 1; });
 
   return { ok: true, leaderboard: entries.slice(0, 20) };
+}
+
+// ── Generación de preguntas con IA ─────────────────────────────────
+
+function buildPrompt(examId, skillId, count) {
+  var ctx = EXAM_CONTEXT[examId];
+  var skillDesc = (skillId && ctx.skills[skillId]) ? ctx.skills[skillId] : 'variedad de habilidades del examen';
+  var skillLabel = skillId || 'mixed';
+
+  return 'Eres un experto evaluador de la PAES chilena (Prueba de Acceso a la Educación Superior).\n' +
+    'Tu tarea: generar exactamente ' + count + ' preguntas de "' + ctx.name + '".\n' +
+    'Habilidad objetivo: "' + skillDesc + '".\n\n' +
+    ctx.instructions + '\n\n' +
+    'FORMATO DE RESPUESTA — responde ÚNICAMENTE con un array JSON válido, sin texto adicional:\n' +
+    '[\n' +
+    '  {\n' +
+    '    "text": "Texto completo de la pregunta. Si es comprensión lectora, incluye el texto de lectura aquí seguido de la pregunta.",\n' +
+    '    "options": ["Primera opción", "Segunda opción", "Tercera opción", "Cuarta opción", "Quinta opción"],\n' +
+    '    "correct": 0,\n' +
+    '    "skill": "' + skillLabel + '",\n' +
+    '    "explanation": "Explicación detallada de por qué esa es la respuesta correcta y por qué las otras son incorrectas."\n' +
+    '  }\n' +
+    ']\n\n' +
+    'REGLAS CRÍTICAS:\n' +
+    '- Responde SOLO con el array JSON, sin markdown ni texto extra\n' +
+    '- "correct" es el índice 0-based de la opción correcta (0=primera, 1=segunda...)\n' +
+    '- Cada pregunta debe tener exactamente 5 opciones\n' +
+    '- Los distractores deben ser plausibles pero incorrectos\n' +
+    '- Para matemáticas: verifica el cálculo dos veces antes de responder\n' +
+    '- Nivel de dificultad: real PAES (4° medio Chile)\n' +
+    '- Genera exactamente ' + count + ' preguntas';
+}
+
+function callGemini(prompt) {
+  var props = PropertiesService.getScriptProperties();
+  var key = props.getProperty('GEMINI_API_KEY');
+  if (!key) throw new Error('GEMINI_API_KEY no configurada en Script Properties de GAS');
+
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + key;
+  var payload = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.75, maxOutputTokens: 4096 },
+  };
+
+  var resp = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  });
+
+  var data = JSON.parse(resp.getContentText());
+  if (data.error) throw new Error('Gemini API error: ' + data.error.message);
+  return data.candidates[0].content.parts[0].text;
+}
+
+function callClaude(prompt) {
+  var props = PropertiesService.getScriptProperties();
+  var key = props.getProperty('CLAUDE_API_KEY');
+  if (!key) throw new Error('CLAUDE_API_KEY no configurada en Script Properties de GAS');
+
+  var payload = {
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 4096,
+    messages: [{ role: 'user', content: prompt }],
+  };
+
+  var resp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  });
+
+  var data = JSON.parse(resp.getContentText());
+  if (data.error) throw new Error('Claude API error: ' + data.error.message);
+  return data.content[0].text;
+}
+
+function parseAIResponse(raw) {
+  // Intento directo
+  try { return JSON.parse(raw); } catch (_) {}
+
+  // Extraer bloque JSON del texto
+  var match = raw.match(/\[[\s\S]*\]/);
+  if (match) {
+    try { return JSON.parse(match[0]); } catch (_) {}
+  }
+
+  throw new Error('La IA no devolvió JSON válido');
+}
+
+function saveToAIBank(questions, examId, skillId, userEmail) {
+  try {
+    var sheet = getSheet('banco_ia');
+    var now = new Date().toISOString();
+    questions.forEach(function(q) {
+      sheet.appendRow([
+        q.id, examId, skillId || 'mixed',
+        q.text, JSON.stringify(q.options), q.correct,
+        q.explanation, userEmail || 'unknown', now,
+      ]);
+    });
+  } catch (_) {
+    // No crítico — no interrumpir el flujo
+  }
+}
+
+function generateQuestion(p) {
+  var examId  = p.examId;
+  var skillId = p.skillId || null;
+  var count   = Math.min(Number(p.count) || 5, 10);
+
+  var ctx = EXAM_CONTEXT[examId];
+  if (!ctx) return { error: 'examId no reconocido: ' + examId };
+
+  var prompt = buildPrompt(examId, skillId, count);
+
+  var raw;
+  try {
+    if (AI_PROVIDER === 'gemini') {
+      raw = callGemini(prompt);
+    } else if (AI_PROVIDER === 'claude') {
+      raw = callClaude(prompt);
+    } else {
+      return { error: 'AI_PROVIDER no reconocido: ' + AI_PROVIDER };
+    }
+  } catch (e) {
+    return { error: e.toString() };
+  }
+
+  var parsed;
+  try {
+    parsed = parseAIResponse(raw);
+    if (!Array.isArray(parsed)) parsed = [parsed];
+  } catch (e) {
+    return { error: e.toString() };
+  }
+
+  // Normalizar y validar cada pregunta
+  var ts = String(Date.now());
+  var questions = parsed
+    .map(function(q, i) {
+      return {
+        id:          'ai_' + examId + '_' + (skillId || 'mix') + '_' + ts + '_' + i,
+        skill:       q.skill || skillId || 'mixed',
+        text:        String(q.text || '').trim(),
+        options:     Array.isArray(q.options) ? q.options.map(String) : [],
+        correct:     typeof q.correct === 'number' ? q.correct : 0,
+        explanation: String(q.explanation || '').trim(),
+        aiGenerated: true,
+        provider:    AI_PROVIDER,
+      };
+    })
+    .filter(function(q) {
+      return q.text.length > 0 && q.options.length >= 4;
+    });
+
+  if (questions.length === 0) {
+    return { error: 'La IA generó preguntas con formato inválido. Intenta nuevamente.' };
+  }
+
+  // Guardar en banco_ia para historial
+  saveToAIBank(questions, examId, skillId, p.userEmail);
+
+  return { ok: true, questions: questions, provider: AI_PROVIDER, count: questions.length };
 }

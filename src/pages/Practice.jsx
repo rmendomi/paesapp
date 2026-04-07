@@ -118,6 +118,11 @@ export default function Practice({ data, onFinish, onBack }) {
               Sin retroalimentación
             </span>
           )}
+          {q.aiGenerated && (
+            <span className="badge" style={{ background: 'rgba(124,58,237,0.1)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.2)' }}>
+              ✨ Generada por IA
+            </span>
+          )}
         </div>
 
         {/* Question text */}

@@ -1,14 +1,7 @@
 import { useState } from 'react';
-import { ArrowRight, GraduationCap, ChevronDown, CheckCircle, Target, BookOpen, TrendingUp, Star, BarChart2, Zap, Shield } from 'lucide-react';
+import { ArrowRight, GraduationCap, ChevronDown, CheckCircle, Target, BookOpen, TrendingUp, BarChart2, Zap, Shield, Sparkles, Brain, Trophy, Star } from 'lucide-react';
 import WaveDecor, { BookStackIcon } from '../components/Decor';
 import { exams } from '../data/mockData';
-
-const features = [
-  { icon: '📖', title: 'Comprensión Lectora', desc: 'Entrena inferencia, vocabulario contextual, tipos de texto y recursos literarios.' },
-  { icon: '📐', title: 'Matemática M1 y M2', desc: 'Álgebra, geometría, estadística, cálculo y trigonometría con retroalimentación inmediata.' },
-  { icon: '🌎', title: 'Historia y Cs. Sociales', desc: 'Desde la prehistoria hasta la actualidad: Chile, mundo, geografía y ciudadanía.' },
-  { icon: '🧬', title: 'Ciencias', desc: 'Biología, Física y Química con preguntas estilo PAES real y explicaciones detalladas.' },
-];
 
 const steps = [
   { n: '01', title: 'Elige tu prueba', desc: 'Selecciona la prueba que quieres practicar y el número de preguntas.' },
@@ -17,10 +10,35 @@ const steps = [
   { n: '04', title: 'Supera tu meta', desc: 'Sigue tu progreso en el tiempo y llega a la PAES con confianza.' },
 ];
 
-const testimonials = [
-  { name: 'Sofía Riquelme', role: '4° Medio, Santiago', text: 'Subí 80 puntos en M1 en solo tres semanas. Las explicaciones de cada pregunta son increíbles.', rating: 5 },
-  { name: 'Matías Contreras', role: 'Ex alumno 2025', text: 'El mejor simulador que usé para prepararme. Pasé de 620 a 710 en Comprensión Lectora.', rating: 5 },
-  { name: 'Camila Rojas', role: '4° Medio, Temuco', text: 'Me ayudó a identificar exactamente dónde tenía mis puntos débiles. ¡Totalmente recomendado!', rating: 5 },
+const platformStats = [
+  { value: '+200',  label: 'Preguntas en el banco',    sub: 'Cubren todas las habilidades PAES',       icon: BookOpen,  color: '#1d4ed8', bg: 'rgba(29,78,216,0.1)'  },
+  { value: '5',     label: 'Pruebas PAES completas',   sub: 'Lectora, M1, M2, Historia y Ciencias',    icon: Target,    color: '#0891b2', bg: 'rgba(8,145,178,0.1)'  },
+  { value: 'IA',    label: 'Preguntas generadas al instante', sub: 'Gemini crea preguntas únicas cada sesión', icon: Sparkles, color: '#7c3aed', bg: 'rgba(124,58,237,0.1)' },
+  { value: '100%',  label: 'Gratis para siempre',      sub: 'Sin suscripción ni tarjeta requerida',    icon: Trophy,    color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
+];
+
+const differentiators = [
+  {
+    icon: Brain,
+    title: 'Plan adaptativo con IA',
+    desc: 'La inteligencia artificial analiza tus resultados reales y genera un plan semanal priorizando exactamente las materias donde tienes más que ganar.',
+    tag: 'Exclusivo',
+    tagColor: '#7c3aed',
+  },
+  {
+    icon: Sparkles,
+    title: 'Preguntas únicas generadas por IA',
+    desc: 'Además del banco de preguntas, Gemini crea preguntas originales en tiempo real. Nunca te quedas sin material nuevo para practicar.',
+    tag: 'Powered by Gemini',
+    tagColor: '#1d4ed8',
+  },
+  {
+    icon: BarChart2,
+    title: 'Calculadora + buscador de carreras',
+    desc: 'Ingresa tus puntajes, calcula tu percentil nacional y descubre en qué carreras calificas con tus puntajes ponderados reales del DEMRE.',
+    tag: 'Todo en uno',
+    tagColor: '#0891b2',
+  },
 ];
 
 export default function Landing({ onEnter }) {
@@ -40,8 +58,8 @@ export default function Landing({ onEnter }) {
               style={{ background: 'rgba(59,130,246,0.1)', color: '#1d4ed8' }}>2026</span>
           </div>
           <nav className="hidden md:flex items-center gap-7">
-            {['Pruebas', 'Cómo funciona', 'Testimonios'].map(s => (
-              <a key={s} href={`#${s.toLowerCase().replace(' ','-')}`}
+            {['Pruebas', 'Cómo funciona', 'La plataforma'].map(s => (
+              <a key={s} href={`#${s === 'La plataforma' ? 'testimonios' : s.toLowerCase().replace(' ','-')}`}
                 className="text-sm font-medium transition-colors"
                 style={{ color: 'rgba(12,31,61,0.5)', textDecoration: 'none' }}
                 onMouseEnter={e => e.target.style.color = '#1d4ed8'}
@@ -64,8 +82,8 @@ export default function Landing({ onEnter }) {
         </div>
         {menuOpen && (
           <div className="md:hidden px-6 pb-4 space-y-2 border-t" style={{ borderColor: 'rgba(12,31,61,0.06)', background: '#f8faff' }}>
-            {['Pruebas', 'Cómo funciona', 'Testimonios'].map(s => (
-              <a key={s} href={`#${s.toLowerCase().replace(' ','-')}`}
+            {['Pruebas', 'Cómo funciona', 'La plataforma'].map(s => (
+              <a key={s} href={`#${s === 'La plataforma' ? 'testimonios' : s.toLowerCase().replace(' ','-')}`}
                 onClick={() => setMenuOpen(false)}
                 className="block py-2 text-sm font-medium" style={{ color: '#0c1f3d', textDecoration: 'none' }}>
                 {s}
@@ -266,29 +284,51 @@ export default function Landing({ onEnter }) {
         </div>
       </section>
 
-      {/* ── Testimonials ── */}
-      <section id="testimonios" className="py-24"
-        style={{ background: 'linear-gradient(135deg, #0c1f3d, #1d4ed8)' }}>
+      {/* ── Métricas reales ── */}
+      <section id="testimonios" className="py-24" style={{ background: '#eff6ff' }}>
         <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-14">
-            <p className="text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: '#93c5fd' }}>Estudiantes</p>
-            <h2 className="font-display text-4xl font-light text-white">Lo que dicen <em>quienes ya lo usaron</em></h2>
+          <div className="text-center mb-12">
+            <p className="text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: '#1d4ed8' }}>La plataforma</p>
+            <h2 className="font-display text-4xl font-light" style={{ color: '#0c1f3d' }}>
+              Números <em>que sí son reales</em>
+            </h2>
+            <p className="text-sm mt-3 max-w-lg mx-auto" style={{ color: 'rgba(12,31,61,0.5)' }}>
+              Sin testimonios inventados. Solo lo que la plataforma realmente ofrece.
+            </p>
           </div>
+
+          {/* Stats grid */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-16">
+            {platformStats.map(({ value, label, sub, icon: Icon, color, bg }) => (
+              <div key={label} className="p-6 rounded-3xl card-lift text-center"
+                style={{ background: 'white', boxShadow: '0 2px 20px rgba(12,31,61,0.06)' }}>
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: bg }}>
+                  <Icon size={22} style={{ color }} />
+                </div>
+                <p className="font-display text-4xl font-bold mb-1" style={{ color }}>{value}</p>
+                <p className="font-semibold text-sm mb-1" style={{ color: '#0c1f3d' }}>{label}</p>
+                <p className="text-xs leading-relaxed" style={{ color: 'rgba(12,31,61,0.45)' }}>{sub}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Diferenciadores */}
           <div className="grid md:grid-cols-3 gap-6">
-            {testimonials.map((t, i) => (
-              <div key={i} className="p-6 rounded-3xl card-lift"
-                style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(10px)' }}>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="flex gap-1">
-                    {[...Array(t.rating)].map((_, j) => <Star key={j} size={12} fill="#f59e0b" stroke="none" />)}
+            {differentiators.map(({ icon: Icon, title, desc, tag, tagColor }) => (
+              <div key={title} className="p-6 rounded-3xl card-lift"
+                style={{ background: 'white', boxShadow: '0 2px 20px rgba(12,31,61,0.06)' }}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: `${tagColor}12` }}>
+                    <Icon size={18} style={{ color: tagColor }} />
                   </div>
-                  <span className="text-xs px-2 py-0.5 rounded-full"
-                    style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)' }}>
-                    {t.role}
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                    style={{ background: `${tagColor}12`, color: tagColor }}>
+                    {tag}
                   </span>
                 </div>
-                <p className="font-display text-lg italic leading-relaxed mb-4 text-white/80">&ldquo;{t.text}&rdquo;</p>
-                <p className="text-sm font-semibold" style={{ color: '#93c5fd' }}>{t.name}</p>
+                <h3 className="font-display font-semibold text-base mb-2" style={{ color: '#0c1f3d' }}>{title}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: 'rgba(12,31,61,0.55)' }}>{desc}</p>
               </div>
             ))}
           </div>

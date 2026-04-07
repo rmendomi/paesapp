@@ -1,4 +1,4 @@
-import { LayoutDashboard, BookOpen, TrendingUp, Settings, LogOut, GraduationCap, Calculator, Building2, Calendar, Trophy, Flame } from 'lucide-react';
+import { LayoutDashboard, BookOpen, TrendingUp, Settings, LogOut, GraduationCap, Building2, Calendar, Trophy, Flame } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const navGroups = [
@@ -13,9 +13,8 @@ const navGroups = [
   {
     label: 'Herramientas',
     items: [
-      { id: 'calculator',   label: 'Calculadora',    icon: Calculator },
-      { id: 'universities', label: 'Universidades',  icon: Building2 },
-      { id: 'planner',      label: 'Planificador',   icon: Calendar },
+      { id: 'universities', label: 'Universidades & Calc.', icon: Building2 },
+      { id: 'planner',      label: 'Planificador IA',       icon: Calendar },
     ],
   },
   {
