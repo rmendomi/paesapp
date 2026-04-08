@@ -1,40 +1,41 @@
 import { useState, useEffect } from 'react';
+import { Menu } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
-import Landing     from './pages/Landing';
-import Login       from './pages/Login';
-import Register    from './pages/Register';
-import Dashboard   from './pages/Dashboard';
-import Exams       from './pages/Exams';
-import Practice    from './pages/Practice';
-import Results     from './pages/Results';
-import Progress    from './pages/Progress';
-import Settings    from './pages/Settings';
-import Calculator  from './pages/Calculator';
-import Universities from './pages/Universities';
-import Planner     from './pages/Planner';
-import Leaderboard from './pages/Leaderboard';
-import Sidebar     from './components/Sidebar';
+import Landing       from './pages/Landing';
+import Login         from './pages/Login';
+import Register      from './pages/Register';
+import Dashboard     from './pages/Dashboard';
+import Exams         from './pages/Exams';
+import Practice      from './pages/Practice';
+import Results       from './pages/Results';
+import Progress      from './pages/Progress';
+import Settings      from './pages/Settings';
+import Calculator    from './pages/Calculator';
+import Universities  from './pages/Universities';
+import Planner       from './pages/Planner';
+import Leaderboard   from './pages/Leaderboard';
+import Sidebar       from './components/Sidebar';
 
 const studentPages = {
-  dashboard:    Dashboard,
-  exams:        Exams,
-  progress:     Progress,
-  settings:     Settings,
-  calculator:   Universities,   // calculator redirige a Universities (están integradas)
-  universities: Universities,
-  planner:      Planner,
-  leaderboard:  Leaderboard,
+  dashboard:     Dashboard,
+  exams:         Exams,
+  progress:      Progress,
+  settings:      Settings,
+  calculator:    Universities,
+  universities:  Universities,
+  planner:       Planner,
+  leaderboard:   Leaderboard,
 };
 
 const PAGE_TITLES = {
-  dashboard:    'Panel Principal',
-  exams:        'Pruebas PAES',
-  progress:     'Mi Progreso',
-  settings:     'Configuración',
-  calculator:   'Universidades y Calculadora',
-  universities: 'Universidades y Calculadora',
-  planner:      'Planificador',
-  leaderboard:  'Ranking',
+  dashboard:     'Panel Principal',
+  exams:         'Pruebas PAES',
+  progress:      'Mi Progreso',
+  settings:      'Configuración',
+  calculator:    'Universidades y Calculadora',
+  universities:  'Universidades y Calculadora',
+  planner:       'Planificador',
+  leaderboard:   'Ranking',
 };
 
 function getInitials(name) {
@@ -47,6 +48,7 @@ export default function App() {
   const [view,         setView]         = useState('landing');
   const [practiceData, setPracticeData] = useState(null);
   const [resultData,   setResultData]   = useState(null);
+  const [sidebarOpen,  setSidebarOpen]  = useState(false);
 
   const { user, logout, authLoading } = useAuth();
 
@@ -116,17 +118,33 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar current={view} onNavigate={navigate} onLogout={handleLogout} />
+      <Sidebar
+        current={view}
+        onNavigate={navigate}
+        onLogout={handleLogout}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
-      <main className="flex-1 ml-64 min-h-screen" style={{ background: '#f8faff' }}>
+      {/* Main content: en desktop ml-64; en mobile ml-0 (sidebar se superpone) */}
+      <main className="flex-1 min-h-screen lg:ml-64" style={{ background: '#f8faff' }}>
         {/* Top bar */}
         <div
-          className="sticky top-0 z-30 h-14 flex items-center px-8 justify-between backdrop-blur-md"
+          className="sticky top-0 z-20 h-14 flex items-center px-4 sm:px-8 justify-between backdrop-blur-md"
           style={{ background: 'rgba(248,250,255,0.92)', borderBottom: '1px solid rgba(12,31,61,0.06)' }}
         >
-          <p className="font-display text-base font-semibold capitalize" style={{ color: '#0c1f3d' }}>
-            {PAGE_TITLES[view] || view}
-          </p>
+          <div className="flex items-center gap-3">
+            {/* Hamburger — solo mobile */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-2 rounded-xl hover:bg-black/5 transition-colors"
+            >
+              <Menu size={18} style={{ color: '#0c1f3d' }} />
+            </button>
+            <p className="font-display text-base font-semibold capitalize" style={{ color: '#0c1f3d' }}>
+              {PAGE_TITLES[view] || view}
+            </p>
+          </div>
           <div className="flex items-center gap-3">
             {user?.picture ? (
               <img

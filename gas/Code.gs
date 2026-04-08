@@ -395,7 +395,10 @@ function buildPrompt(examId, skillId, count) {
     '  }\n' +
     ']\n\n' +
     'REGLAS CRÍTICAS:\n' +
-    '- Responde SOLO con el array JSON, sin markdown ni texto extra\n' +
+    '- Tu respuesta debe comenzar DIRECTAMENTE con el carácter [ sin ningún texto previo\n' +
+    '- Tu respuesta debe terminar DIRECTAMENTE con el carácter ] sin ningún texto posterior\n' +
+    '- NO uses bloques de código markdown (no uses ```)\n' +
+    '- NO agregues explicaciones, comentarios ni texto adicional antes o después del JSON\n' +
     '- "correct" es el índice 0-based de la opción correcta (0=primera, 1=segunda...)\n' +
     '- Cada pregunta debe tener exactamente 5 opciones\n' +
     '- Los distractores deben ser plausibles pero incorrectos\n' +
@@ -455,16 +458,38 @@ function callClaude(prompt) {
 }
 
 function parseAIResponse(raw) {
-  // Intento directo
-  try { return JSON.parse(raw); } catch (_) {}
+  if (!raw) throw new Error('La IA devolvió una respuesta vacía');
 
-  // Extraer bloque JSON del texto
-  var match = raw.match(/\[[\s\S]*\]/);
-  if (match) {
-    try { return JSON.parse(match[0]); } catch (_) {}
+  // 1. Intento directo
+  try { return JSON.parse(raw.trim()); } catch (_) {}
+
+  // 2. Eliminar bloques markdown ```json ... ``` o ``` ... ```
+  var stripped = raw
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
+  try { return JSON.parse(stripped); } catch (_) {}
+
+  // 3. Extraer primer bloque JSON array [ ... ]
+  var arrayMatch = raw.match(/\[[\s\S]*?\](?=\s*$)/);
+  if (!arrayMatch) arrayMatch = raw.match(/\[[\s\S]*\]/);
+  if (arrayMatch) {
+    try { return JSON.parse(arrayMatch[0]); } catch (_) {}
+    // Intentar reparar JSON truncado añadiendo cierre
+    try { return JSON.parse(arrayMatch[0] + ']'); } catch (_) {}
   }
 
-  throw new Error('La IA no devolvió JSON válido');
+  // 4. Extraer entre la primera [ y última ]
+  var start = raw.indexOf('[');
+  var end   = raw.lastIndexOf(']');
+  if (start !== -1 && end > start) {
+    var slice = raw.slice(start, end + 1);
+    try { return JSON.parse(slice); } catch (_) {}
+  }
+
+  // Adjuntar fragmento de la respuesta para diagnóstico
+  var preview = raw.substring(0, 200).replace(/\n/g, '\\n');
+  throw new Error('La IA no devolvió JSON válido. Respuesta recibida: ' + preview);
 }
 
 function saveToAIBank(questions, examId, skillId, userEmail) {

@@ -373,6 +373,87 @@ export const api = {
     return { ok: true, leaderboard: entries };
   },
 
+  // ── Banco de preguntas IA: obtener no-vistas por usuario ──────────
+  async getBancoQuestions(examId, skillId, userEmail, count) {
+    try {
+      // Ids ya vistos por este usuario en este examen
+      const { data: vistas } = await supabase
+        .from('preguntas_vistas')
+        .select('question_id')
+        .eq('user_email', userEmail)
+        .eq('exam_id', examId);
+
+      const vistoIds = (vistas || []).map(v => v.question_id);
+
+      // Buscar preguntas disponibles en banco_ia
+      let query = supabase
+        .from('banco_ia')
+        .select('*')
+        .eq('exam_id', examId)
+        .order('veces_usada', { ascending: true });
+
+      if (skillId) query = query.eq('skill_id', skillId);
+
+      const { data: banco } = await query;
+      if (!banco || banco.length === 0) return [];
+
+      // Filtrar las no vistas
+      const noVistas = banco.filter(q => !vistoIds.includes(q.id));
+
+      // Seleccionar hasta `count` preguntas, priorizando las menos usadas
+      const selected = noVistas.slice(0, count);
+      return selected.map(q => ({
+        id:          q.id,
+        skill:       q.skill_id,
+        text:        q.text,
+        options:     Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]'),
+        correct:     q.correct,
+        explanation: q.explanation || '',
+        aiGenerated: true,
+        provider:    q.generado_por?.includes('@') ? 'banco' : 'claude',
+        fromBanco:   true,
+      }));
+    } catch (_) {
+      return [];
+    }
+  },
+
+  // Marcar preguntas como vistas (llamar tras servir preguntas al usuario)
+  async markQuestionsAsSeen(userEmail, questions, examId) {
+    if (!userEmail || !questions?.length) return;
+    try {
+      const rows = questions.map(q => ({
+        user_email:  userEmail,
+        question_id: q.id,
+        exam_id:     examId,
+        skill_id:    q.skill || 'mixed',
+        fue_correcta: null,
+      }));
+      await supabase.from('preguntas_vistas').upsert(rows, { onConflict: 'user_email,question_id', ignoreDuplicates: true });
+
+      // Incrementar contador veces_usada
+      const ids = questions.map(q => q.id);
+      // Incrementar en lote (mejor esfuerzo)
+      await Promise.all(ids.map(id =>
+        supabase.rpc('increment_veces_usada', { qid: id }).catch(() => {})
+      ));
+    } catch (_) { /* no crítico */ }
+  },
+
+  // Actualizar resultado de preguntas (correcta/incorrecta) después de la sesión
+  async updateQuestionsResults(userEmail, answers) {
+    if (!userEmail || !answers?.length) return;
+    try {
+      await Promise.all(answers.map(a =>
+        supabase.from('preguntas_vistas')
+          .update({ fue_correcta: a.correct })
+          .eq('user_email', userEmail)
+          .eq('question_id', a.questionId)
+          .catch(() => {})
+      ));
+    } catch (_) { /* no crítico */ }
+  },
+
   async generateStudyPlan({ name, progressStats, targets }) {
     const examNames = {
       lectora: 'Comprensión Lectora', m1: 'Matemática M1',
@@ -433,7 +514,43 @@ REGLAS CRÍTICAS:
     if (!ctx) throw new Error('examId no reconocido: ' + examId);
 
     const n = Math.min(Number(count) || 5, 10);
-    const result = await callGASForQuestions({ examId, skillId, count: n, userEmail });
-    return result;
+
+    // ── Estrategia 50/50: banco existente + nuevas por IA ─────────────
+    let bancoQuestions = [];
+    if (userEmail) {
+      bancoQuestions = await this.getBancoQuestions(examId, skillId, userEmail, Math.ceil(n / 2));
+    }
+
+    const fromBanco   = bancoQuestions.length;
+    const needFromAI  = n - fromBanco;
+
+    let aiQuestions = [];
+    if (needFromAI > 0) {
+      try {
+        const result = await callGASForQuestions({ examId, skillId, count: needFromAI, userEmail });
+        aiQuestions = result.questions || [];
+        // Guardar nuevas en banco_ia de Supabase también
+        if (aiQuestions.length > 0) {
+          await saveToBancoIA(aiQuestions, examId, skillId, userEmail);
+        }
+      } catch (e) {
+        if (fromBanco === 0) throw e; // si no hay nada del banco, propagar el error
+      }
+    }
+
+    const allQuestions = [...bancoQuestions, ...aiQuestions];
+
+    // Marcar todas como vistas para este usuario
+    if (userEmail && allQuestions.length > 0) {
+      await this.markQuestionsAsSeen(userEmail, allQuestions, examId);
+    }
+
+    return {
+      ok:        true,
+      questions: allQuestions,
+      fromBanco: fromBanco,
+      fromAI:    aiQuestions.length,
+      count:     allQuestions.length,
+    };
   },
 };

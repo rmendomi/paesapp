@@ -6,8 +6,9 @@ import { api, IS_DEMO_BACKEND } from '../api';
 
 export default function Exams({ onNavigate }) {
   const { user } = useAuth();
-  const [modal,     setModal]     = useState(null);  // { examId } | null
-  const [aiLoading, setAiLoading] = useState(false);
+  const [modal,        setModal]        = useState(null);  // { examId } | null
+  const [aiLoading,    setAiLoading]    = useState(false);
+  const [freeLoading,  setFreeLoading]  = useState(false);
 
   const openModal  = (examId) => setModal({ examId });
   const closeModal = () => setModal(null);
@@ -40,26 +41,57 @@ export default function Exams({ onNavigate }) {
     }
   };
 
-  const startPractice = (examId, mode, skillId = null) => {
+  const startPractice = async (examId, mode, skillId = null) => {
     const exam = exams.find(e => e.id === examId);
-    let questions;
     let skillName = null;
+    let count;
 
-    if (mode === 'practice') {
-      // 10 random questions from all skills
-      const all = getAllQuestions(examId);
-      questions = shuffle(all).slice(0, 10);
-    } else if (mode === 'skill' && skillId) {
-      const skill = skillsConfig[examId].find(s => s.id === skillId);
-      skillName = `${exam.name} · ${skill.name}`;
-      questions = shuffle(getSkillQuestions(examId, skillId)).slice(0, 20);
-    } else if (mode === 'global') {
-      const all = getAllQuestions(examId);
-      questions = shuffle(all);
-    }
+    if (mode === 'practice')       count = 10;
+    else if (mode === 'skill')     count = 20;
+    else /* global */              count = null; // toda la base
 
     closeModal();
-    onNavigate('practice', { examId, questions, mode: mode === 'practice' ? 'practice' : 'exam', skillName });
+    setFreeLoading(true);
+
+    try {
+      // 1. Buscar en banco_ia (preguntas no vistas por el usuario)
+      let bancoQs = [];
+      if (user?.email && !IS_DEMO_BACKEND) {
+        bancoQs = await api.getBancoQuestions(examId, skillId || null, user.email, count || 999);
+      }
+
+      // 2. Completar con mockData si el banco no alcanza
+      let staticQs;
+      if (mode === 'skill' && skillId) {
+        const skill = skillsConfig[examId].find(s => s.id === skillId);
+        skillName = `${exam.name} · ${skill.name}`;
+        staticQs = getSkillQuestions(examId, skillId);
+      } else {
+        staticQs = getAllQuestions(examId);
+      }
+
+      // Filtrar duplicados (banco ya tiene esas preguntas)
+      const bancoIds = new Set(bancoQs.map(q => q.id));
+      const filtered = staticQs.filter(q => !bancoIds.has(q.id));
+
+      // Mezclar banco primero, luego estáticas, cortar al límite
+      const combined = [...bancoQs, ...shuffle(filtered)];
+      const questions = count ? combined.slice(0, count) : combined;
+
+      // 3. Marcar como vistas las del banco que vamos a mostrar
+      if (user?.email && bancoQs.length > 0) {
+        api.markQuestionsAsSeen(user.email, bancoQs, examId).catch(() => {});
+      }
+
+      onNavigate('practice', {
+        examId,
+        questions,
+        mode: mode === 'practice' ? 'practice' : 'exam',
+        skillName,
+      });
+    } finally {
+      setFreeLoading(false);
+    }
   };
 
   return (
@@ -71,7 +103,16 @@ export default function Exams({ onNavigate }) {
           style={{ background: 'rgba(12,31,61,0.75)', backdropFilter: 'blur(8px)' }}>
           <div className="w-14 h-14 rounded-full border-4 border-white/20 border-t-white animate-spin" />
           <p className="font-semibold text-white text-lg">Generando preguntas con IA...</p>
-          <p className="text-white/50 text-sm">Gemini está creando preguntas únicas para ti</p>
+          <p className="text-white/50 text-sm">Buscando en banco y generando nuevas preguntas</p>
+        </div>
+      )}
+      {/* Loading overlay — práctica libre (buscando en banco) */}
+      {freeLoading && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4"
+          style={{ background: 'rgba(12,31,61,0.6)', backdropFilter: 'blur(6px)' }}>
+          <div className="w-14 h-14 rounded-full border-4 border-white/20 border-t-blue-400 animate-spin" />
+          <p className="font-semibold text-white text-lg">Cargando preguntas...</p>
+          <p className="text-white/50 text-sm">Buscando en el banco compartido</p>
         </div>
       )}
       <div className="fade-up delay-1">
